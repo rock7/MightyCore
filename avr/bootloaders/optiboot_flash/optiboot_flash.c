@@ -468,6 +468,32 @@ void pre_main(void) {
   );
 }
 
+void jumpToApp (void)
+{
+    // Turn off watchdog
+    watchdogConfig(WATCHDOG_OFF);
+    // Note that appstart_vec is defined so that this works with either
+    // real or virtual boot partitions.
+      __asm__ __volatile__ (
+    // Jump to 'save' or RST vector
+  #ifdef VIRTUAL_BOOT_PARTITION
+    // full code version for virtual boot partition
+    "ldi r30,%[rstvec]\n"
+    "clr r31\n"
+    "ijmp\n"::[rstvec] "M"(appstart_vec)
+  #else
+  #ifdef RAMPZ
+    // use absolute jump for devices with lot of flash
+    "jmp 0\n"::
+  #else
+    // use rjmp to go around end of flash to address 0
+    // it uses fact that optiboot_version constant is 2 bytes before end of flash
+    "rjmp optiboot_version+2\n"
+  #endif //RAMPZ
+  #endif //VIRTUAL_BOOT_PARTITION
+  );
+}
+
 
 /* main program starts here */
 int main(void) {
@@ -556,29 +582,7 @@ int main(void) {
        * executes before normal c init code) to save R2 to a global variable.
        */
       __asm__ __volatile__ ("mov r2, %0\n" :: "r" (ch));
-
-      // Turn off watchdog
-      watchdogConfig(WATCHDOG_OFF);
-      // Note that appstart_vec is defined so that this works with either
-      // real or virtual boot partitions.
-       __asm__ __volatile__ (
-      // Jump to 'save' or RST vector
- #ifdef VIRTUAL_BOOT_PARTITION
-      // full code version for virtual boot partition
-      "ldi r30,%[rstvec]\n"
-      "clr r31\n"
-      "ijmp\n"::[rstvec] "M"(appstart_vec)
- #else
- #ifdef RAMPZ
-      // use absolute jump for devices with lot of flash
-      "jmp 0\n"::
- #else
-      // use rjmp to go around end of flash to address 0
-      // it uses fact that optiboot_version constant is 2 bytes before end of flash
-      "rjmp optiboot_version+2\n"
- #endif //RAMPZ
- #endif //VIRTUAL_BOOT_PARTITION
-    );
+      jumpToApp();
     }
   }
   
@@ -806,8 +810,8 @@ int main(void) {
     }
     else if (ch == STK_LEAVE_PROGMODE) { /* 'Q' */
       // Adaboot no-wait mod
-      watchdogConfig(WATCHDOG_16MS);
       verifySpace();
+      jumpToApp();
     }
     else {
       // This covers the response to commands like STK_ENTER_PROGMODE
