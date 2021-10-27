@@ -472,6 +472,10 @@ void jumpToApp (void)
 {
     // Turn off watchdog
     watchdogConfig(WATCHDOG_OFF);
+
+    // Put 0xAA in regster 3 which the app code can access to determin if we just came from the bootloader
+    __asm__ __volatile__ ("mov r3, %0\n" :: "r" (0xAA));
+
     // Note that appstart_vec is defined so that this works with either
     // real or virtual boot partitions.
       __asm__ __volatile__ (
